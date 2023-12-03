@@ -17,5 +17,6 @@ if __name__ == '__main__':
                     "password": open("password.txt", "r").read(), "prefix": sys.argv[5], "postfix": sys.argv[6]}
     mySqlInfo = sqlInfo.MySqlInfo(mySqlDetails)
 
-    sqlLiteDetails = {"path": sys.argv[1], "prefix": sys.argv[5], "postfix": sys.argv[7], "mySqlInfo": mySqlInfo}
+    sqlLiteDetails = {"path": sys.argv[1], "prefix": sys.argv[5], "postfix": sys.argv[7], "mySqlInfo": mySqlInfo,
+                      "mySqlPostfix": sys.argv[6]}
     sqlLiteInfo = sqlInfo.SqlLiteInfo(sqlLiteDetails)

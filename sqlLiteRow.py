@@ -1,3 +1,4 @@
+import sqlite3
 import typing
 
 if typing.TYPE_CHECKING:
@@ -5,11 +6,66 @@ if typing.TYPE_CHECKING:
 
 
 class MissingDataException(Exception):
+    def __init__(self, details=None):
+
+        if details is not None:
+            cnx = sqlite3.connect(details["path"])
+            cursor = cnx.cursor()
+
+
+            usersString = (f"INSERT INTO {details['prefix']}user{details['mySqlPostfix']}"
+                           f"(time, user, uuid) VALUES ")
+            worldsString = (f"INSERT INTO {details['prefix']}world{details['mySqlPostfix']} "
+                            f"(world) VALUES ")
+            blockdataString = f"INSERT INTO {details['prefix']}blockdata_map{details['mySqlPostfix']} VALUES "
+
+
+            if len(missingUsers) == 0:
+                usersString = ""
+            else:
+                for missingUser in missingUsers:
+                    uuid = missingUser[0]
+                    if uuid is None:
+                        uuid = "NULL"
+                    usersString += f"({missingUser[2]}, {missingUser[1]}, {uuid}),"
+                usersString = usersString.rstrip(",")
+                usersString += ";"
+
+
+            if len(missingWorlds) == 0:
+                worldsString = ""
+            else:
+                for missingWorld in missingWorlds:
+                    worldsString += f"({missingWorld}),"
+                worldsString = worldsString.rstrip(",")
+                worldsString += ";"
+
+            if len(missingBlockdata) == 0:
+                blockdataString = ""
+            else:
+                for item in missingBlockdata:
+                    blockdataString += f"({item}),"
+                blockdataString = blockdataString.rstrip(",")
+                blockdataString += ";"
+
+            self.string = "There is missing data, please use the following sql statements and then re run the script:\n\n" + usersString + "\n\n" + worldsString + "\n\n" + blockdataString + "\n\n"
+
+            cursor.close()
+            cnx.close()
+
+        else:
+            self.string = "There is missing data, see above"
+
+
+
     def __str__(self):
-        return "Missing data, see above"
+        return self.string
 
 
-alreadyDeclaredMissing = set()  # To ensure missing data is not repeated
+alreadyDeclaredMissing: set[str] = set()  # To ensure missing data is not repeated
+missingUsers = set()
+missingWorlds = set()
+missingBlockdata = set()
 
 
 class SqlLiteRow:
@@ -20,14 +76,21 @@ class SqlLiteRow:
         self.time = time
 
         self.sqlLiteUser = sqlLiteUser
-        name = sqlLiteInfo.users[sqlLiteUser]
+        uuid = sqlLiteInfo.users["uuid"][sqlLiteUser] if sqlLiteUser in sqlLiteInfo.users["uuid"] else None
+        user = sqlLiteInfo.users["user"][sqlLiteUser]
         try:
-            self.mySqlUser = mySqlInfo.users.inverse[name]
+            if uuid is not None:
+                self.mySqlUuid = mySqlInfo.users["uuid"].inverse[uuid]
+            else:
+                self.mySqlUuid = mySqlInfo.users["user"].inverse[user]
         except KeyError as e:
-            message = "No user: " + str(e)
+
+            message = f"No user: {user}, {uuid}"
             if message not in alreadyDeclaredMissing:
                 print(message)
                 alreadyDeclaredMissing.add(message)
+                missingUsers.add((sqlLiteInfo.users["uuid"][sqlLiteUser], sqlLiteInfo.users["user"][sqlLiteUser],
+                                  sqlLiteInfo.users["time"][sqlLiteUser]))
             missingData = True
 
         self.sqlLiteWid = sqlLiteWid
@@ -39,6 +102,7 @@ class SqlLiteRow:
             if message not in alreadyDeclaredMissing:
                 print(message)
                 alreadyDeclaredMissing.add(message)
+                missingWorlds.add(name)
             missingData = True
 
         self.x = x
@@ -63,6 +127,7 @@ class SqlLiteRow:
                     if message not in alreadyDeclaredMissing:
                         print(message)
                         alreadyDeclaredMissing.add(message)
+                        missingBlockdata.add(name)
                     missingData = True
             self.mySqlBlockdata = ",".join(newIds)
 

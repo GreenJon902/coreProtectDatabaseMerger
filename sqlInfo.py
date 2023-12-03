@@ -1,6 +1,7 @@
 import abc
 import os
 import sqlite3
+from typing import Union
 
 import mysql.connector
 
@@ -14,7 +15,7 @@ CACHE_MYSQL = os.getenv("CACHE_MYSQL", "0") == "1"
 
 
 class SqlInfo:
-    users: bidict[int, str]  # Maps from database uid to minecraft uuid or #natural_process_name
+    users: dict[str, bidict[int, str]]  # Inner maps from database uid to time or user or uuid, Outer selects which
     worlds: bidict[int, str]  # Maps from database wid to minecraft world name
     blockdata_map: bidict[int, str]  # Maps from database wid to minecraft world name
 
@@ -36,25 +37,31 @@ class SqlInfo:
         print(f"Loading:")
 
         # For user, prefer to use uuid when can (aka when player) otherwise default to user (when natural)
-        self.users = SqlInfo.load_dict(cursor, "rowid", "CASE WHEN uuid IS NOT NULL THEN uuid ELSE user END AS value",
-                                       f"{details['prefix']}user{details['postfix']}")
+        self.users = SqlInfo.load_dict(cursor, f"{details['prefix']}user{details['postfix']}", "rowid",
+                                       {"time": dict, "user": bidict, "uuid": bidict}, type_=dict)
         print(f"\tUsers: {self.users}")
-        self.worlds = SqlInfo.load_dict(cursor, "id", "world",
-                                        f"{details['prefix']}world{details['postfix']}")
+        self.worlds = SqlInfo.load_dict(cursor, f"{details['prefix']}world{details['postfix']}", "id", "world")
         print(f"\tWorlds: {self.worlds}")
-        self.blockdata_map = SqlInfo.load_dict(cursor, "id", "data",
-                                               f"{details['prefix']}blockdata_map{details['postfix']}")
+        self.blockdata_map = SqlInfo.load_dict(cursor, f"{details['prefix']}blockdata_map{details['postfix']}", "id",
+                                               "data")
         print(f"\tBlockdata_Map: {self.blockdata_map}")
 
     @classmethod
-    def load_dict(cls, cursor, keyName, valueName, tableName) -> bidict[int, str]:
-        users = bidict()
+    def load_dict(cls, cursor, tableName, keyName, valueName: Union[str, dict[str, type]], type_: type = bidict):
+        if isinstance(valueName, str):
+            result = type_()
 
-        cursor.execute(f"SELECT {keyName}, {valueName} FROM {tableName}")
-        for uid, uuid in cursor:
-            users[uid] = uuid
+            cursor.execute(f"SELECT {keyName}, {valueName} FROM {tableName}")
+            for k, v in cursor:
+                if v is not None:
+                    result[k] = v
+        else:
+            result = type_()
+            for vName, subtype_ in valueName.items():
+                print(f"\t\tLoading for {vName}")
+                result[vName] = SqlInfo.load_dict(cursor, tableName, keyName, vName, type_=subtype_)
 
-        return users
+        return result
 
 
 class MySqlInfo(SqlInfo):
@@ -95,7 +102,7 @@ class SqlLiteInfo(SqlInfo):
 
         self.rows = [None] * count  # Optimize memory allocation
         cursor.execute(f"SELECT time, user, wid, x, y, z, type, data, meta, blockdata, action, rolled_back "
-                       f"FROM {details['prefix']}block{details['postfix']} LIMIT 1000000000000000")  # TODO: Remove limit
+                       f"FROM {details['prefix']}block{details['postfix']}")
         i = 0
         missingData = False  # So we can get all missing data and then crash after wards when we know it all
         for values in cursor:
@@ -108,4 +115,4 @@ class SqlLiteInfo(SqlInfo):
             i += 1
         print(f"\tRows Raw: ...")
         if missingData:
-            raise MissingDataException
+            raise MissingDataException(details)
