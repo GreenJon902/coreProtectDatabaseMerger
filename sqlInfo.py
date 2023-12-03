@@ -4,15 +4,19 @@ import sqlite3
 
 import mysql.connector
 
+from bidict import bidict
+
 import pickle
+
+from sqlLiteRow import SqlLiteRow, MissingDataException
 
 CACHE_MYSQL = os.getenv("CACHE_MYSQL", "0") == "1"
 
 
 class SqlInfo:
-    users: dict[int, str]  # Maps from database uid to minecraft uuid
-    worlds: dict[int, str]  # Maps from database wid to minecraft world name
-    blockdata_map: dict[int, str]  # Maps from database wid to minecraft world name
+    users: bidict[int, str]  # Maps from database uid to minecraft uuid or #natural_process_name
+    worlds: bidict[int, str]  # Maps from database wid to minecraft world name
+    blockdata_map: bidict[int, str]  # Maps from database wid to minecraft world name
 
     def __init__(self, details):
         """
@@ -30,25 +34,24 @@ class SqlInfo:
 
     def load(self, cursor, details):
         print(f"Loading:")
-        self.users = SqlInfo.load_dict(cursor, "rowid", "uuid",
-                                       f"{details['prefix']}user{details['postfix']}", False)
+
+        # For user, prefer to use uuid when can (aka when player) otherwise default to user (when natural)
+        self.users = SqlInfo.load_dict(cursor, "rowid", "CASE WHEN uuid IS NOT NULL THEN uuid ELSE user END AS value",
+                                       f"{details['prefix']}user{details['postfix']}")
         print(f"\tUsers: {self.users}")
         self.worlds = SqlInfo.load_dict(cursor, "id", "world",
-                                        f"{details['prefix']}world{details['postfix']}", False)
+                                        f"{details['prefix']}world{details['postfix']}")
         print(f"\tWorlds: {self.worlds}")
         self.blockdata_map = SqlInfo.load_dict(cursor, "id", "data",
-                                               f"{details['prefix']}blockdata_map{details['postfix']}", False)
+                                               f"{details['prefix']}blockdata_map{details['postfix']}")
         print(f"\tBlockdata_Map: {self.blockdata_map}")
 
     @classmethod
-    def load_dict(cls, cursor, keyName, valueName, tableName, allowNone) -> dict[int, str]:
-        users = {}
+    def load_dict(cls, cursor, keyName, valueName, tableName) -> bidict[int, str]:
+        users = bidict()
 
         cursor.execute(f"SELECT {keyName}, {valueName} FROM {tableName}")
         for uid, uuid in cursor:
-            if not allowNone and uuid is None:
-                print(f"\t\tIgnoring {keyName}: {valueName} as is None")
-                continue
             users[uid] = uuid
 
         return users
@@ -70,13 +73,14 @@ class MySqlInfo(SqlInfo):
             pickle.dump(self, open("mySqlCache", "wb"))
 
     def getConnectionAndCursor(self, details):
-        cnx = mysql.connector.connect(**details)
+        cnx = mysql.connector.connect(user=details["user"], host=details["host"], password=details["password"],
+                                      database=details["database"])
         cursor = cnx.cursor()
         return cnx, cursor
 
 
 class SqlLiteInfo(SqlInfo):
-    rows_raw: list
+    rows: list
 
     def getConnectionAndCursor(self, details):
         cnx = sqlite3.connect(details["path"])
@@ -89,14 +93,19 @@ class SqlLiteInfo(SqlInfo):
         cursor.execute(f"SELECT count() FROM {details['prefix']}block{details['postfix']}")
         count = cursor.fetchone()[0]
 
-        self.rows_raw = [None] * count  # Optimize memory allocation
+        self.rows = [None] * count  # Optimize memory allocation
         cursor.execute(f"SELECT time, user, wid, x, y, z, type, data, meta, blockdata, action, rolled_back "
-                       f"FROM {details['prefix']}block{details['postfix']} LIMIT 1000")  # TODO: Remove limit
+                       f"FROM {details['prefix']}block{details['postfix']} LIMIT 1000000000000000")  # TODO: Remove limit
         i = 0
+        missingData = False  # So we can get all missing data and then crash after wards when we know it all
         for values in cursor:
-            self.rows_raw.append(zip(["time", "user", "wid", "x", "y", "z", "type", "data", "meta", "blockdata",
-                                      "action", "rolled_back"], values))
+            try:
+                self.rows[i] = SqlLiteRow(*values, self, details["mySqlInfo"])
+            except MissingDataException:
+                missingData = True
             if i % 500000 == 0:
-                print(f"\t\t{i}/{count}")
+                print(f"\t\t{i}/{count} - {i/count * 100}")
             i += 1
         print(f"\tRows Raw: ...")
+        if missingData:
+            raise MissingDataException
