@@ -111,7 +111,7 @@ class SqlLiteInfo(SqlInfo):
             except MissingDataException:
                 missingData = True
             if i % 500000 == 0:
-                print(f"\t\t{i}/{count} - {i/count * 100}")
+                print(f"\t\t{i}/{count} - {i/count * 100}%")
             i += 1
         print(f"\tRows Raw: ...")
         if missingData:

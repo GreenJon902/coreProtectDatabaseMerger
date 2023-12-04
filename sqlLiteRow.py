@@ -27,7 +27,7 @@ class MissingDataException(Exception):
                     uuid = missingUser[0]
                     if uuid is None:
                         uuid = "NULL"
-                    usersString += f"({missingUser[2]}, {missingUser[1]}, {uuid}),"
+                    usersString += f"({missingUser[2]}, \"{missingUser[1]}\", \"{uuid}\"),"
                 usersString = usersString.rstrip(",")
                 usersString += ";"
 
@@ -36,7 +36,7 @@ class MissingDataException(Exception):
                 worldsString = ""
             else:
                 for missingWorld in missingWorlds:
-                    worldsString += f"({missingWorld}),"
+                    worldsString += f"(\"{missingWorld}\"),"
                 worldsString = worldsString.rstrip(",")
                 worldsString += ";"
 
@@ -44,11 +44,12 @@ class MissingDataException(Exception):
                 blockdataString = ""
             else:
                 for item in missingBlockdata:
-                    blockdataString += f"({item}),"
+                    blockdataString += f"(\"{item}\"),"
                 blockdataString = blockdataString.rstrip(",")
                 blockdataString += ";"
 
-            self.string = "There is missing data, please use the following sql statements and then re run the script:\n\n" + usersString + "\n\n" + worldsString + "\n\n" + blockdataString + "\n\n"
+            self.string = ("There is missing data, please use the following sql statements and then re run the script:\n"
+                           "\n") + usersString + "\n\nThe next two will need modification and then and the row id set\n\n" + worldsString + "\n\n" + blockdataString + "\n\n"
 
             cursor.close()
             cnx.close()
