@@ -1,5 +1,7 @@
 import os.path
 import sys
+
+import inserter
 import sqlInfo
 import sqlLiteRow
 
@@ -20,3 +22,7 @@ if __name__ == '__main__':
     sqlLiteDetails = {"path": sys.argv[1], "prefix": sys.argv[5], "postfix": sys.argv[7], "mySqlInfo": mySqlInfo,
                       "mySqlPostfix": sys.argv[6]}
     sqlLiteInfo = sqlInfo.SqlLiteInfo(sqlLiteDetails)
+
+    print("Assuming imported collumn already exists")
+    inserter.insert(mySqlDetails, sqlLiteInfo)
+    #TODO: MAKE IT MAKE A NEW COLUM ON CO BLOCK TO SAY IMPORTED. THEN DO AN IMPORT.

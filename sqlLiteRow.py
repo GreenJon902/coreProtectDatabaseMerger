@@ -18,6 +18,7 @@ class MissingDataException(Exception):
             worldsString = (f"INSERT INTO {details['prefix']}world{details['mySqlPostfix']} "
                             f"(world) VALUES ")
             blockdataString = f"INSERT INTO {details['prefix']}blockdata_map{details['mySqlPostfix']} VALUES "
+            materialString = f"INSERT INTO {details['prefix']}material_map{details['mySqlPostfix']} VALUES "
 
 
             if len(missingUsers) == 0:
@@ -48,8 +49,16 @@ class MissingDataException(Exception):
                 blockdataString = blockdataString.rstrip(",")
                 blockdataString += ";"
 
+            if len(missingMaterials) == 0:
+                materialString = ""
+            else:
+                for item in missingMaterials:
+                    materialString += f"(\"{item}\"),"
+                materialString = materialString.rstrip(",")
+                materialString += ";"
+
             self.string = ("There is missing data, please use the following sql statements and then re run the script:\n"
-                           "\n") + usersString + "\n\nThe next two will need modification and then and the row id set\n\n" + worldsString + "\n\n" + blockdataString + "\n\n"
+                           "\n") + usersString + "\n\nThe next three will need modification and then and the row id set\n\n" + worldsString + "\n\n" + blockdataString + "\n\n" + materialString + "\n\n"
 
             cursor.close()
             cnx.close()
@@ -67,10 +76,11 @@ alreadyDeclaredMissing: set[str] = set()  # To ensure missing data is not repeat
 missingUsers = set()
 missingWorlds = set()
 missingBlockdata = set()
+missingMaterials = set()
 
 
 class SqlLiteRow:
-    def __init__(self, time, sqlLiteUser, sqlLiteWid, x, y, z, type_, data, meta, sqlLiteBlockdata, action, rolled_back,
+    def __init__(self, time, sqlLiteUser, sqlLiteWid, x, y, z, sqlLiteType_, data, meta, sqlLiteBlockdata, action, rolled_back,
                  sqlLiteInfo: "SqlInfo", mySqlInfo: "SqlInfo"):  # Hint as SqlInfo rows aren't loaded yet.
         missingData = False  # So we can get all missing data and then crash afterwards when we know it all
 
@@ -109,7 +119,20 @@ class SqlLiteRow:
         self.x = x
         self.y = y
         self.z = z
-        self.type_ = type_
+
+        self.sqlLiteType_ = sqlLiteType_
+        material = sqlLiteInfo.material_map[self.sqlLiteType_]
+        try:
+            self.mySqlType_ = mySqlInfo.material_map.inverse[material]
+        except KeyError as e:
+            message = f"No material: {sqlLiteType_}, {material}"
+            if message not in alreadyDeclaredMissing:
+                print(message)
+                alreadyDeclaredMissing.add(message)
+                missingMaterials.add(material)
+            missingData = True
+
+
         self.data = data
         self.meta = meta
 
@@ -137,3 +160,11 @@ class SqlLiteRow:
 
         if missingData:
             raise MissingDataException
+
+    def __str__(self):
+        return (f"Row({self.time}, ({self.sqlLiteUser}, {self.mySqlUuid}), ({self.sqlLiteWid}, {self.mySqlWid}), "
+                f"{self.x}, {self.y}, {self.z}, ({self.sqlLiteType_}, {self.mySqlType_}), {self.data}, {self.meta}, "
+                f"({self.sqlLiteBlockdata}, {self.mySqlBlockdata}), {self.action}, {self.rolled_back})")
+
+
+

@@ -18,6 +18,7 @@ class SqlInfo:
     users: dict[str, bidict[int, str]]  # Inner maps from database uid to time or user or uuid, Outer selects which
     worlds: bidict[int, str]  # Maps from database wid to minecraft world name
     blockdata_map: bidict[int, str]  # Maps from database wid to minecraft world name
+    material_map: bidict[int, str]  # Maps from database block type to minecraft block name
 
     def __init__(self, details):
         """
@@ -45,6 +46,9 @@ class SqlInfo:
         self.blockdata_map = SqlInfo.load_dict(cursor, f"{details['prefix']}blockdata_map{details['postfix']}", "id",
                                                "data")
         print(f"\tBlockdata_Map: {self.blockdata_map}")
+        self.material_map = SqlInfo.load_dict(cursor, f"{details['prefix']}material_map{details['postfix']}", "id",
+                                               "material")
+        print(f"\tMaterial_Map: {self.blockdata_map}")
 
     @classmethod
     def load_dict(cls, cursor, tableName, keyName, valueName: Union[str, dict[str, type]], type_: type = bidict):
@@ -71,7 +75,8 @@ class MySqlInfo(SqlInfo):
             self.users = obj.users
             self.worlds = obj.worlds
             self.blockdata_map = obj.blockdata_map
-            print(f"Got from cache:\n\tUsers: {self.users}\n\tWorld: {self.worlds}\n\tBlockdata_Map: {self.blockdata_map}")
+            self.material_map = obj.material_map
+            print(f"Got from cache:\n\tUsers: {self.users}\n\tWorld: {self.worlds}\n\tBlockdata_Map: {self.blockdata_map}Material_Map: {self.material_map}")
             return
 
         super().__init__(details)
@@ -102,7 +107,7 @@ class SqlLiteInfo(SqlInfo):
 
         self.rows = [None] * count  # Optimize memory allocation
         cursor.execute(f"SELECT time, user, wid, x, y, z, type, data, meta, blockdata, action, rolled_back "
-                       f"FROM {details['prefix']}block{details['postfix']}")
+                       f"FROM {details['prefix']}block{details['postfix']} LIMIT 1010")  ##FIXME:  REMOVE LIMIT
         i = 0
         missingData = False  # So we can get all missing data and then crash after wards when we know it all
         for values in cursor:
