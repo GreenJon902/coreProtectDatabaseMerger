@@ -133,7 +133,7 @@ class SqlLiteRow:
             missingData = True
 
 
-        self.data = data
+        self.data = 0# data  # TODO: Data conversions?
         self.meta = meta
 
         if sqlLiteBlockdata is None:

@@ -48,7 +48,7 @@ class SqlInfo:
         print(f"\tBlockdata_Map: {self.blockdata_map}")
         self.material_map = SqlInfo.load_dict(cursor, f"{details['prefix']}material_map{details['postfix']}", "id",
                                                "material")
-        print(f"\tMaterial_Map: {self.blockdata_map}")
+        print(f"\tMaterial_Map: {self.material_map}")
 
     @classmethod
     def load_dict(cls, cursor, tableName, keyName, valueName: Union[str, dict[str, type]], type_: type = bidict):
@@ -92,7 +92,7 @@ class MySqlInfo(SqlInfo):
 
 
 class SqlLiteInfo(SqlInfo):
-    rows: list
+    rows: list[SqlLiteRow]
 
     def getConnectionAndCursor(self, details):
         cnx = sqlite3.connect(details["path"])
@@ -107,7 +107,7 @@ class SqlLiteInfo(SqlInfo):
 
         self.rows = [None] * count  # Optimize memory allocation
         cursor.execute(f"SELECT time, user, wid, x, y, z, type, data, meta, blockdata, action, rolled_back "
-                       f"FROM {details['prefix']}block{details['postfix']} LIMIT 1010")  ##FIXME:  REMOVE LIMIT
+                       f"FROM {details['prefix']}block{details['postfix']}")
         i = 0
         missingData = False  # So we can get all missing data and then crash after wards when we know it all
         for values in cursor:

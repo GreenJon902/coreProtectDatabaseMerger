@@ -25,4 +25,3 @@ if __name__ == '__main__':
 
     print("Assuming imported collumn already exists")
     inserter.insert(mySqlDetails, sqlLiteInfo)
-    #TODO: MAKE IT MAKE A NEW COLUM ON CO BLOCK TO SAY IMPORTED. THEN DO AN IMPORT.
