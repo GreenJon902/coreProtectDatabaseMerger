@@ -9,7 +9,7 @@ from bidict import bidict
 
 import pickle
 
-from sqlLiteRow import SqlLiteRow, MissingDataException
+from sqlLiteRow import SqlLiteRow, MissingDataException, ZeroMaterialException
 
 CACHE_MYSQL = os.getenv("CACHE_MYSQL", "0") == "1"
 
@@ -113,6 +113,8 @@ class SqlLiteInfo(SqlInfo):
         for values in cursor:
             try:
                 self.rows[i] = SqlLiteRow(*values, self, details["mySqlInfo"])
+            except ZeroMaterialException:
+                print("Warning, got no material for " + str(values))
             except MissingDataException:
                 missingData = True
             if i % 500000 == 0:

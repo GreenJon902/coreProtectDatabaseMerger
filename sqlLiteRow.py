@@ -5,6 +5,10 @@ if typing.TYPE_CHECKING:
     from sqlInfo import SqlInfo
 
 
+class ZeroMaterialException(Exception):
+    pass
+
+
 class MissingDataException(Exception):
     def __init__(self, details=None):
 
@@ -120,17 +124,25 @@ class SqlLiteRow:
         self.y = y
         self.z = z
 
-        self.sqlLiteType_ = sqlLiteType_
-        material = sqlLiteInfo.material_map[self.sqlLiteType_]
-        try:
-            self.mySqlType_ = mySqlInfo.material_map.inverse[material]
-        except KeyError as e:
-            message = f"No material: {sqlLiteType_}, {material}"
-            if message not in alreadyDeclaredMissing:
-                print(message)
-                alreadyDeclaredMissing.add(message)
-                missingMaterials.add(material)
-            missingData = True
+        if sqlLiteType_ == 0:
+            if action != 3:
+                raise ZeroMaterialException()
+
+            else:  # Player kill event doesnt have a block type but is stored in co block
+                self.sqlLiteType_ = sqlLiteType_
+                self.mySqlType_ = sqlLiteType_
+        else:
+            self.sqlLiteType_ = sqlLiteType_
+            material = sqlLiteInfo.material_map[self.sqlLiteType_]
+            try:
+                self.mySqlType_ = mySqlInfo.material_map.inverse[material]
+            except KeyError as e:
+                message = f"No material: {sqlLiteType_}, {material}"
+                if message not in alreadyDeclaredMissing:
+                    print(message)
+                    alreadyDeclaredMissing.add(message)
+                    missingMaterials.add(material)
+                missingData = True
 
 
         self.data = 0# data  # TODO: Data conversions?

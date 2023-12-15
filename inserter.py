@@ -21,9 +21,11 @@ def insert(details, sqlLiteInfo: SqlLiteInfo):
     print("Rows to be inserted: " + str(len(data)) + ". Examples:")
     print(sqlLiteInfo.rows[0:10])
     print(data[0:10])
-    if input("All data is prepared, type 'y' to continue") == 'y':
+    if input("All data is prepared, enter 'y' to continue") == 'y':
         print("Starting...")
-        cursor.executemany(query, data)
+        for i in range(0, len(sqlLiteInfo.rows) - 1, 10000):
+            print(f"Uploading {i} to {i + 10000}...")
+            cursor.executemany(query, data[i:i+10000])
         print("Done")
 
     cursor.close()
